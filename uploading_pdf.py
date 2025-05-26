@@ -3,35 +3,73 @@ from mistralai import Mistral
 import os
 from dotenv import load_dotenv
 import tempfile
-import time # Import the time module
+import time
 from markdown_pdf import MarkdownPdf
 from io import BytesIO
-import markdown2, pdfkit
-import tempfile 
+import markdown2
+from reportlab.lib.pagesizes import LETTER
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
+
+# def convert_md_to_pdf(md_content):
+#     import markdown2
+#     import pdfkit
+#     import tempfile
+
+#     # Convert Markdown to HTML
+#     html_content = markdown2.markdown(md_content)
+
+#     # Save HTML to a temporary file
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as temp_html:
+#         temp_html.write(html_content.encode("utf-8"))
+#         temp_html_path = temp_html.name
+
+#     # Define wkhtmltopdf options
+#     options = {
+#         'enable-local-file-access': None  # Avoid protocol errors
+#     }
+
+#     # Convert HTML to PDF
+#     pdf_path = temp_html_path.replace(".html", ".pdf")
+#     pdfkit.from_file(temp_html_path, pdf_path, options=options)
+
+#     return pdf_path
+
+import markdown2
+from reportlab.lib.pagesizes import LETTER
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
+import tempfile
 
 def convert_md_to_pdf(md_content):
-    import markdown2
-    import pdfkit
-    import tempfile
-
-    # Convert Markdown to HTML
+    # Convert Markdown to plain text
     html_content = markdown2.markdown(md_content)
+    plain_text = html_content.replace('<p>', '').replace('</p>', '\n').replace('<br>', '\n').replace('<br />', '\n')
 
-    # Save HTML to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as temp_html:
-        temp_html.write(html_content.encode("utf-8"))
-        temp_html_path = temp_html.name
+    # Create a temporary PDF file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+        temp_pdf_path = temp_pdf.name
 
-    # Define wkhtmltopdf options
-    options = {
-        'enable-local-file-access': None  # Avoid protocol errors
-    }
+    # Create PDF using ReportLab
+    c = canvas.Canvas(temp_pdf_path, pagesize=LETTER)
+    width, height = LETTER
+    text_object = c.beginText(40, height - 40)
+    text_object.setFont("Helvetica", 11)
 
-    # Convert HTML to PDF
-    pdf_path = temp_html_path.replace(".html", ".pdf")
-    pdfkit.from_file(temp_html_path, pdf_path, options=options)
+    lines = simpleSplit(plain_text, 'Helvetica', 11, width - 80)
+    for line in lines:
+        if text_object.getY() < 40:  # Check for page overflow
+            c.drawText(text_object)
+            c.showPage()
+            text_object = c.beginText(40, height - 40)
+            text_object.setFont("Helvetica", 11)
+        text_object.textLine(line)
 
-    return pdf_path
+    c.drawText(text_object)
+    c.save()
+
+    return temp_pdf_path
+
 
 
 # Load environment variables (ensure MISTRAL_API_KEY is in your .env file)

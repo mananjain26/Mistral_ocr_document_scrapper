@@ -4,6 +4,35 @@ import os
 from dotenv import load_dotenv
 import tempfile
 import time # Import the time module
+from markdown_pdf import MarkdownPdf
+from io import BytesIO
+import markdown2, pdfkit
+import tempfile 
+
+def convert_md_to_pdf(md_content):
+    import markdown2
+    import pdfkit
+    import tempfile
+
+    # Convert Markdown to HTML
+    html_content = markdown2.markdown(md_content)
+
+    # Save HTML to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as temp_html:
+        temp_html.write(html_content.encode("utf-8"))
+        temp_html_path = temp_html.name
+
+    # Define wkhtmltopdf options
+    options = {
+        'enable-local-file-access': None  # Avoid protocol errors
+    }
+
+    # Convert HTML to PDF
+    pdf_path = temp_html_path.replace(".html", ".pdf")
+    pdfkit.from_file(temp_html_path, pdf_path, options=options)
+
+    return pdf_path
+
 
 # Load environment variables (ensure MISTRAL_API_KEY is in your .env file)
 load_dotenv()
@@ -87,6 +116,30 @@ if uploaded_file is not None:
             # Optional: Display full response for debugging
             with st.expander("View Full OCR Response"):
                 st.json(ocr_response.model_dump_json())
+            
+            
+                # --- Generate PDF using markdown-pdf ---
+            st.info("Generating PDF from markdown content using markdown-pdf...")
+            
+                # Combine markdown from all pages
+            combined_markdown = "\n\n---\n\n".join([page.markdown for page in ocr_response.pages])
+
+            # Convert the combined markdown to PDF
+            pdf_path = convert_md_to_pdf(combined_markdown)
+
+            # Load PDF into buffer for download
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_buffer = BytesIO(pdf_file.read())
+
+            # Streamlit download button
+            st.download_button(
+                label="Download Extracted Markdown as PDF",
+                data=pdf_buffer.getvalue(),
+                file_name="extracted_text.pdf",
+                mime="application/pdf"
+            )
+            # Display success message       
+            st.success("PDF generated from markdown and ready for download!")
 
         except Exception as e:
             st.error(f"An error occurred during OCR processing: {e}")
